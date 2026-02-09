@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lecture-transcriber"
+version = "0.1.0"
+requires-python = ">=3.11"
+description = "CLI tool to transcribe lecture videos into structured Markdown notes"
+
+dependencies = [
+    "mistralai",
+    "opencv-python",
+    "numpy",
+    "scikit-image",
+    "imagehash",
+    "click",
+    "pyyaml",
+    "rich",
+    "tenacity",
+    "python-dotenv",
+]
+
+[project.scripts]
+lecture-transcribe = "lecture_transcriber.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["lecture_transcriber*"]
