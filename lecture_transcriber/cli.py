@@ -65,7 +65,7 @@ def main(
 
     # CLI overrides
     if terms:
-        cfg.context_bias_terms = [t.strip() for t in terms.split(",")]
+        cfg.context_bias_terms = [t.strip() for t in terms.split(",") if t.strip()]
     if vision_model:
         cfg.vision_model = vision_model
     if vision_max_tokens is not None:

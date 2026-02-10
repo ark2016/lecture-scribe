@@ -214,11 +214,13 @@ class MistralClient:
         audio_path = Path(audio_path)
 
         def _do_transcribe():
+            with open(audio_path, "rb") as f:
+                file_bytes = f.read()
             kwargs: dict = {
                 "model": "voxtral-mini-latest",
                 "file": {
                     "file_name": audio_path.name,
-                    "content": open(audio_path, "rb"),
+                    "content": file_bytes,
                 },
                 "timestamp_granularities": ["segment"],
                 "language": language,
