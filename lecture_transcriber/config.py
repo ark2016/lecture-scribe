@@ -37,7 +37,12 @@ class Config:
     use_phash_prefilter: bool = True
 
     # Visual recognition
-    vision_model: str = "mistral-small-latest"
+    vision_model: str = "mistral-large-latest"
+    vision_max_tokens: int | None = None
+    vision_min_interval: float = 8.0
+    vision_max_429_retries: int = 3
+    vision_rate_limit_base_wait: float = 20.0
+    vision_abort_on_rate_limit: bool = True
     skip_minor_updates: bool = True
 
     # Merge
