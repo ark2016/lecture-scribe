@@ -258,11 +258,16 @@ class MistralClient:
         prompt: str,
         model: str = "mistral-small-latest",
         max_tokens: int | None = None,
+        system_prompt: str | None = None,
     ) -> str:
         """Send a text-only prompt to the chat API and return the response."""
+        messages: list[dict] = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
         kwargs: dict = {
             "model": model,
-            "messages": [{"role": "user", "content": prompt}],
+            "messages": messages,
         }
         if max_tokens is not None:
             kwargs["max_tokens"] = max_tokens

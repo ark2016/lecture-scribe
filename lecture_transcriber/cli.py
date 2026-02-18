@@ -9,14 +9,16 @@ import click
 from rich.logging import RichHandler
 
 from lecture_transcriber.config import Config
-from lecture_transcriber.pipeline import run_pipeline
+from lecture_transcriber.pipeline import AUDIO_EXTENSIONS
 
 
 @click.command()
-@click.argument("video", type=click.Path(exists=True, path_type=Path))
+@click.argument("input_file", type=click.Path(exists=True, path_type=Path))
 @click.option("-o", "--output", type=click.Path(path_type=Path), default=None, help="Output Markdown path.")
 @click.option("--config", "config_path", type=click.Path(path_type=Path), default=None, help="YAML config file.")
 @click.option("--terms", default=None, help="Comma-separated context bias terms for transcription.")
+@click.option("--subject", default="", help="Subject name for structured notes (e.g. 'Математический анализ').")
+@click.option("--postprocess-model", default=None, help="LLM model for post-processing (default: mistral-large-latest).")
 @click.option("--vision-model", default=None, help="Mistral vision model name.")
 @click.option("--vision-max-tokens", type=click.IntRange(1, None), default=None, help="Cap tokens generated per vision response.")
 @click.option("--vision-interval", type=float, default=None, help="Minimum seconds between vision API calls.")
@@ -36,10 +38,12 @@ from lecture_transcriber.pipeline import run_pipeline
 @click.option("--save-visual", type=click.Path(path_type=Path), default=None, help="Path to save visual segments JSON.")
 @click.option("--cache", is_flag=True, default=False, help="Reuse cached intermediate files (transcript, keyframes, visual) if they exist.")
 def main(
-    video: Path,
+    input_file: Path,
     output: Path | None,
     config_path: Path | None,
     terms: str | None,
+    subject: str,
+    postprocess_model: str | None,
     vision_model: str | None,
     vision_max_tokens: int | None,
     vision_interval: float | None,
@@ -54,7 +58,7 @@ def main(
     save_visual: Path | None,
     cache: bool,
 ) -> None:
-    """Transcribe a lecture VIDEO into structured Markdown notes."""
+    """Transcribe a lecture VIDEO or AUDIO file into structured Markdown notes."""
     logging.basicConfig(
         level=logging.DEBUG if debug else logging.INFO,
         handlers=[RichHandler(rich_tracebacks=True)],
@@ -66,6 +70,10 @@ def main(
     # CLI overrides
     if terms:
         cfg.context_bias_terms = [t.strip() for t in terms.split(",") if t.strip()]
+    if subject:
+        cfg.subject = subject
+    if postprocess_model:
+        cfg.postprocess_model = postprocess_model
     if vision_model:
         cfg.vision_model = vision_model
     if vision_max_tokens is not None:
@@ -85,22 +93,39 @@ def main(
         )
 
     if output is None:
-        output = video.with_suffix(".md")
+        output = input_file.with_suffix(".md")
 
-    run_pipeline(
-        video_path=video,
-        output_path=output,
-        config=cfg,
-        save_keyframes=save_keyframes,
-        save_transcript=save_transcript,
-        save_visual=save_visual,
-        no_audio=no_audio,
-        title=title,
-        cache=cache,
-    )
+    # Auto-detect: audio-only vs. video pipeline
+    is_audio_only = input_file.suffix.lower() in AUDIO_EXTENSIONS
 
-    html_output = output.with_suffix(".html")
-    click.echo(f"Done! Output: {output} + {html_output}")
+    if is_audio_only:
+        from lecture_transcriber.pipeline import run_audio_pipeline
+
+        run_audio_pipeline(
+            audio_path=input_file,
+            output_path=output,
+            config=cfg,
+            subject=subject or cfg.subject,
+            save_transcript=save_transcript,
+            cache=cache,
+        )
+        click.echo(f"Done! Output: {output}")
+    else:
+        from lecture_transcriber.pipeline import run_pipeline
+
+        run_pipeline(
+            video_path=input_file,
+            output_path=output,
+            config=cfg,
+            save_keyframes=save_keyframes,
+            save_transcript=save_transcript,
+            save_visual=save_visual,
+            no_audio=no_audio,
+            title=title,
+            cache=cache,
+        )
+        html_output = output.with_suffix(".html")
+        click.echo(f"Done! Output: {output} + {html_output}")
 
 
 if __name__ == "__main__":

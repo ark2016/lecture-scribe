@@ -53,6 +53,11 @@ class Config:
     include_audio_text: bool = True
     output_format: str = "markdown"
 
+    # Audio-only post-processing
+    subject: str = ""
+    postprocess_model: str = "mistral-large-latest"
+    postprocess_chunk_words: int = 8000
+
     @classmethod
     def load(cls, config_path: str | Path | None = None) -> Config:
         """Load config from YAML file, then overlay environment variables."""

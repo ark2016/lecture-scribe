@@ -229,3 +229,105 @@ def _seg_to_dict(s: TranscriptSegment) -> dict:
         "text": s.text, "start": s.start, "end": s.end,
         "words": [{"text": w.text, "start": w.start, "end": w.end} for w in s.words],
     }
+
+
+# --- Audio-only pipeline ----------------------------------------------------
+
+AUDIO_EXTENSIONS = frozenset((
+    ".aac", ".mp3", ".m4a", ".wav", ".ogg", ".flac", ".wma", ".opus",
+))
+
+
+def _build_frontmatter(subject: str, source: str) -> str:
+    """Build YAML frontmatter for Obsidian."""
+    from datetime import date
+
+    lines = ["---"]
+    if subject:
+        lines.append(f'subject: "{subject}"')
+    lines.append(f'source: "{source}"')
+    lines.append(f"date: {date.today().isoformat()}")
+    lines.append("type: lecture-notes")
+    lines.append("---\n\n")
+    return "\n".join(lines)
+
+
+def run_audio_pipeline(
+    audio_path: str | Path,
+    output_path: str | Path,
+    config: Config,
+    *,
+    subject: str = "",
+    save_transcript: str | Path | None = None,
+    cache: bool = False,
+) -> Path:
+    """Run the audio-only pipeline: transcribe + LLM post-process -> Obsidian notes."""
+    audio_path = Path(audio_path)
+    output_path = Path(output_path)
+
+    client = MistralClient(
+        api_key=config.mistral_api_key,
+        rps_limit=config.rps_limit,
+    )
+
+    with Progress() as progress:
+        # --- Stage 1: Convert to WAV if needed --------------------------------
+        task_audio = progress.add_task("Audio preparation", total=2)
+
+        if audio_path.suffix.lower() == ".wav":
+            wav_path = audio_path
+        else:
+            wav_path = extract_audio(audio_path, sample_rate=config.audio_sample_rate)
+        progress.advance(task_audio)
+
+        # --- Stage 2: Transcription -------------------------------------------
+        cached_transcript = _load_cached_transcript(save_transcript) if cache else None
+        if cached_transcript is not None:
+            transcript = cached_transcript
+            log.info("Loaded %d transcript segments from cache", len(transcript))
+        else:
+            transcript = transcribe(
+                wav_path,
+                client,
+                language=config.transcription_language,
+                context_bias=config.context_bias_terms or None,
+            )
+            if save_transcript:
+                Path(save_transcript).write_text(
+                    json.dumps(
+                        [_seg_to_dict(s) for s in transcript],
+                        ensure_ascii=False,
+                        indent=2,
+                    ),
+                    encoding="utf-8",
+                )
+        progress.advance(task_audio)
+
+        # --- Stage 3: LLM post-processing ------------------------------------
+        task_llm = progress.add_task("LLM post-processing", total=1)
+
+        seg_dicts = [
+            {"text": s.text, "start": s.start, "end": s.end}
+            for s in transcript
+        ]
+
+        from lecture_transcriber.llm.postprocessor import postprocess_transcript
+
+        notes_md = postprocess_transcript(
+            segments=seg_dicts,
+            subject=subject or config.subject,
+            client=client,
+            model=config.postprocess_model,
+            target_chunk_words=config.postprocess_chunk_words,
+        )
+        progress.advance(task_llm)
+
+        # --- Stage 4: Write output --------------------------------------------
+        frontmatter = _build_frontmatter(
+            subject=subject or config.subject,
+            source=audio_path.name,
+        )
+        output_path.write_text(frontmatter + notes_md, encoding="utf-8")
+
+    log.info("Output written to %s", output_path)
+    return output_path
