@@ -258,6 +258,7 @@ def run_audio_pipeline(
     config: Config,
     *,
     subject: str = "",
+    mode: str = "lecture",
     save_transcript: str | Path | None = None,
     cache: bool = False,
 ) -> Path:
@@ -319,6 +320,7 @@ def run_audio_pipeline(
             client=client,
             model=config.postprocess_model,
             target_chunk_words=config.postprocess_chunk_words,
+            mode=mode,
         )
         progress.advance(task_llm)
 

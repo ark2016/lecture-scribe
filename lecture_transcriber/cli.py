@@ -18,6 +18,7 @@ from lecture_transcriber.pipeline import AUDIO_EXTENSIONS
 @click.option("--config", "config_path", type=click.Path(path_type=Path), default=None, help="YAML config file.")
 @click.option("--terms", default=None, help="Comma-separated context bias terms for transcription.")
 @click.option("--subject", default="", help="Subject name for structured notes (e.g. 'Математический анализ').")
+@click.option("--mode", type=click.Choice(["lecture", "lab"], case_sensitive=False), default="lecture", help="Prompt mode: 'lecture' for lecture notes, 'lab' for lab assignment conditions.")
 @click.option("--postprocess-model", default=None, help="LLM model for post-processing (default: mistral-large-latest).")
 @click.option("--vision-model", default=None, help="Mistral vision model name.")
 @click.option("--vision-max-tokens", type=click.IntRange(1, None), default=None, help="Cap tokens generated per vision response.")
@@ -43,6 +44,7 @@ def main(
     config_path: Path | None,
     terms: str | None,
     subject: str,
+    mode: str,
     postprocess_model: str | None,
     vision_model: str | None,
     vision_max_tokens: int | None,
@@ -106,6 +108,7 @@ def main(
             output_path=output,
             config=cfg,
             subject=subject or cfg.subject,
+            mode=mode,
             save_transcript=save_transcript,
             cache=cache,
         )
