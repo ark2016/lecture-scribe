@@ -158,6 +158,9 @@ def _load_cached_transcript(path: str | Path | None) -> list[TranscriptSegment] 
         return None
     try:
         data = json.loads(p.read_text(encoding="utf-8"))
+        # Support AI Studio format: {"model": ..., "text": ..., "segments": [...]}
+        if isinstance(data, dict) and "segments" in data:
+            data = data["segments"]
         return [
             TranscriptSegment(
                 text=s["text"], start=s["start"], end=s["end"],
